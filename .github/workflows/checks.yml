@@ -1,0 +1,74 @@
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  install:
+    name: installer puts every file in place
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: dry run changes nothing
+        run: |
+          ./scripts/install.sh --home "$RUNNER_TEMP/dry" --dry-run
+          test ! -e "$RUNNER_TEMP/dry" || { echo "dry run created files" >&2; exit 1; }
+      - name: install into a scratch home
+        run: |
+          H="$RUNNER_TEMP/home"
+          ./scripts/install.sh --home "$H"
+          for f in \
+            "$H/.agents/workflows/work-with-workflow/list_workflows.py" \
+            "$H/.pi/agent/AGENTS.md" \
+            "$H/.codex/AGENTS.md" \
+            "$H/.opencode/AGENTS.md" \
+            "$H/.claude/CLAUDE.md" \
+            "$H/.agents/.env" \
+            "$H/.agents/.config"; do
+            test -f "$f" || { echo "missing after install: $f" >&2; exit 1; }
+          done
+          cmp -s AGENTS.md "$H/.claude/CLAUDE.md" || { echo "CLAUDE.md differs from AGENTS.md" >&2; exit 1; }
+          test -z "$(find "$H/.agents/workflows" -name '__pycache__' -o -name '.pytest_cache')" \
+            || { echo "build artifacts were installed" >&2; exit 1; }
+      - name: re-run is idempotent and preserves secrets
+        run: |
+          H="$RUNNER_TEMP/home"
+          echo 'CLICKUP_API_TOKEN=pk_mine' > "$H/.agents/.env"
+          ./scripts/install.sh --home "$H"
+          grep -q 'pk_mine' "$H/.agents/.env" || { echo ".env was overwritten" >&2; exit 1; }
+
+  no-secrets:
+    name: no credential files committed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: reject tracked credential files
+        run: |
+          hits=$(git ls-files | grep -iE '(^|/)\.env$|(^|/)\.config$|client_secret.*\.json$|(^|/)token(\..*)?\.json$|(^|/)credentials\.json$|storage_state\.json$|\.(pem|p12|pfx|key)$' || true)
+          if [ -n "$hits" ]; then
+            echo "Credential files must never be tracked:" >&2
+            echo "$hits" >&2
+            exit 1
+          fi
+          echo "OK: no credential files tracked"
+
+  tests:
+    name: python tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: run workflow test suites
+        run: |
+          python -m pip install --quiet pytest
+          failed=0
+          for d in $(find workflows -type d -name tests | sort); do
+            echo "::group::$d"
+            (cd "$(dirname "$d")" && python -m pytest tests -q) || failed=1
+            echo "::endgroup::"
+          done
+          exit $failed

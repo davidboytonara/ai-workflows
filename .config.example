@@ -1,0 +1,85 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CONFIGURATION — every non-secret setting any workflow reads, in one file.
+#
+#   cp .config.example ~/.agents/.config
+#
+# Secrets do NOT belong here — they go in ~/.agents/.env. This file is split
+# out so it stays safe to share, diff, and copy between machines.
+#
+# Every value below is already the built-in default, shown so you can see what
+# a workflow will do without setting anything. You can delete every line and
+# the workflows still run. Uncomment a line only to change it.
+#
+# The exception is the ClickUp ID block, which has no useful default: those
+# identify YOUR workspace and must be filled in before clickup-workflow works.
+# Your filled ~/.agents/.config is gitignored, so those IDs stay private.
+#
+# FORMAT — strict KEY=VALUE, one per line, comments on their own line only.
+# PRECEDENCE — a real environment variable wins, then ~/.agents/.env, then this.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+# ── clickup-workflow ─────────────────────────────────────────────────────────
+# The ID chain identifying your workspace. Fill these in by running:
+#   workflows/clickup-workflow/clickup_resolve_ids.py --write
+# which discovers them from your API token and writes them back here.
+CLICKUP_TEAM_ID=
+CLICKUP_SPACE_ID=
+CLICKUP_FOLDER_ID=
+CLICKUP_LIST_ID=
+CLICKUP_LIST_NAME=
+
+# How epics are modeled in your ClickUp setup:
+#   parent       — epics are ordinary top-level tasks; --epic takes a task id
+#   custom_field — epics live in a custom field; set the id/name below too
+CLICKUP_EPIC_MODEL=parent
+CLICKUP_EPIC_FIELD_ID=
+CLICKUP_EPIC_FIELD_NAME=
+
+# Override only for a self-hosted or proxied ClickUp endpoint.
+#CLICKUP_BASE_URL=https://api.clickup.com
+
+
+# ── gsheet-workflow — API rate limiting ──────────────────────────────────────
+# Lower these if you hit 429s; raise them if your quota is higher than default.
+#GOOGLE_SHEETS_REQUESTS_PER_MINUTE=250
+#GOOGLE_SHEETS_REQUESTS_PER_100S=450
+#GOOGLE_SHEETS_MAX_BACKOFF_ATTEMPTS=4
+# Requests beyond this count in one run get an automatic pause between calls.
+#GOOGLE_SHEETS_AUTO_DELAY_THRESHOLD=50
+#GOOGLE_SHEETS_AUTO_DELAY_SECONDS=1.0
+
+
+# ── gmail-workflow ───────────────────────────────────────────────────────────
+# IANA timezone used to interpret quiet hours and message timestamps.
+#GMAIL_WORKFLOW_TZ=UTC
+# Window during which the summarizer will not send notifications. HH:MM-HH:MM,
+# may wrap past midnight.
+#GMAIL_QUIET_HOURS=23:30-07:00
+# How many days a thread may sit unanswered before it counts as unresolved.
+#GMAIL_REPLY_RESOLUTION_DAYS=3
+# Set to 1 to compose notifications but send nothing. Blank = send normally.
+#GMAIL_SUMMARIZER_DRY_RUN=
+
+
+# ── heartbeat ────────────────────────────────────────────────────────────────
+# IANA timezone for heartbeat schedules.
+#CASPER_HEARTBEAT_TZ=UTC
+
+
+# ── casper / specs-optimization — LLM CLI selection ──────────────────────────
+# Which CLI and model the agent harness invokes. All three must be set together
+# for the override to take effect; otherwise the workflow's own default is used.
+# Match these to whatever your installed CLI actually accepts.
+#PI_CODING_AGENT=
+#PI_PROVIDER=
+#PI_MODEL=
+# Directory the coding agent treats as its workspace root.
+#PI_CODING_AGENT_DIR=
+
+
+# ── shared ───────────────────────────────────────────────────────────────────
+# Log verbosity for scripted workflows: DEBUG, INFO, WARNING, ERROR.
+#LOG_LEVEL=INFO
+# Set to 1 for verbose date-parsing diagnostics.
+#DT_DEBUG=
