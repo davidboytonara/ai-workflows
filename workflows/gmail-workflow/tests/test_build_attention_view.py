@@ -568,6 +568,89 @@ class BuildAttentionViewTest(unittest.TestCase):
         self.assertEqual(item["notification"]["action"], "suppress")
         self.assertEqual(item["notification"]["reason"], "memory_blocked")
 
+    def test_two_axis_urgent_and_important_pushes_urgent(self) -> None:
+        module = load_module()
+        now_ms = 2_000_000_000_000
+        state = {
+            "messages": {
+                "m1": {
+                    "account": "work",
+                    "thread_id": "t1",
+                    "internal_date_ms": now_ms,
+                    "from": "boss@example.com",
+                    "subject": "Escalation",
+                    "summary": "Needs a same-day decision",
+                    "category": "Work",
+                    "urgency": "urgent",
+                    "importance": "important",
+                    "needs_action": True,
+                }
+            },
+            "notification_ledger": {},
+        }
+
+        item = module.build_attention_items(state, now_ms=now_ms, channel="urgent")[0]
+        self.assertEqual(item["urgency_current"], "urgent")
+        self.assertEqual(item["importance_current"], "important")
+        self.assertEqual(item["quadrant_current"], "do_now")
+        self.assertEqual(item["notification"]["action"], "push_urgent")
+        self.assertEqual(item["notification"]["reason"], "new_item")
+
+    def test_two_axis_urgent_but_not_important_does_not_push_urgent(self) -> None:
+        """Delegate quadrant (urgent, not important) surfaces in digest, never as a push."""
+        module = load_module()
+        now_ms = 2_000_000_000_000
+        state = {
+            "messages": {
+                "m1": {
+                    "account": "work",
+                    "thread_id": "t1",
+                    "internal_date_ms": now_ms,
+                    "from": "notices@example.com",
+                    "subject": "Reply today to confirm receipt",
+                    "summary": "Low-stakes confirmation with a same-day nudge",
+                    "category": "System",
+                    "urgency": "urgent",
+                    "importance": "not_important",
+                    "needs_action": False,
+                }
+            },
+            "notification_ledger": {},
+        }
+
+        urgent_item = module.build_attention_items(state, now_ms=now_ms, channel="urgent")[0]
+        self.assertEqual(urgent_item["quadrant_current"], "delegate")
+        self.assertEqual(urgent_item["notification"]["action"], "suppress")
+        self.assertEqual(urgent_item["notification"]["reason"], "not_do_now")
+
+        digest_item = module.build_attention_items(state, now_ms=now_ms, channel="digest")[0]
+        self.assertEqual(digest_item["notification"]["action"], "include_digest")
+
+    def test_legacy_single_field_importance_still_resolves_a_quadrant(self) -> None:
+        """Pre-migration state.json records (single 'importance' field) keep working."""
+        module = load_module()
+        now_ms = 2_000_000_000_000
+        state = {
+            "messages": {
+                "m1": {
+                    "account": "work",
+                    "thread_id": "t1",
+                    "internal_date_ms": now_ms,
+                    "from": "a@example.com",
+                    "subject": "Legacy record",
+                    "summary": "Classified before the urgency/importance split",
+                    "category": "Work",
+                    "importance": "urgent",
+                    "needs_action": False,
+                }
+            },
+            "notification_ledger": {},
+        }
+
+        item = module.build_attention_items(state, now_ms=now_ms, channel="urgent")[0]
+        self.assertEqual(item["quadrant_current"], "do_now")
+        self.assertEqual(item["notification"]["action"], "push_urgent")
+
 
 if __name__ == "__main__":
     unittest.main()

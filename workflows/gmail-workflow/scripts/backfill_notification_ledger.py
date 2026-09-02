@@ -20,6 +20,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from build_attention_view import build_attention_items  # noqa: E402
+from utils.priority import QUADRANT_RANK, quadrant_for  # noqa: E402
 from utils.state_io import STATE_PATH, load_state, save_state, state_lock, utc_now  # noqa: E402
 
 CHANNELS = ("urgent", "digest")
@@ -68,11 +69,16 @@ def latest_marker(markers: list[str]) -> str:
 
 
 def ledger_entry(channel: str, item: dict[str, Any], message_ids: list[str], markers: list[str]) -> dict[str, Any]:
+    quadrant = item.get("quadrant_current")
+    if quadrant not in QUADRANT_RANK:
+        quadrant = quadrant_for(item.get("urgency_current"), item.get("importance_current"))
     return {
         "last_notified_at": latest_marker(markers),
         "last_notified_channel": channel,
         "last_fingerprint": str(item.get("current_fingerprint") or ""),
-        "last_importance": str(item.get("importance_current") or "low"),
+        "last_urgency": str(item.get("urgency_current") or ""),
+        "last_importance": str(item.get("importance_current") or ""),
+        "last_quadrant": quadrant,
         "last_status": str(item.get("status") or "open"),
         "last_seen_ms": to_int(item.get("last_seen_ms")),
         "notified_message_ids": message_ids,
@@ -136,7 +142,7 @@ def plan_backfill(state: dict[str, Any]) -> dict[str, Any]:
                 "channel": channel,
                 "last_seen_ms": entry["last_seen_ms"],
                 "last_fingerprint": entry["last_fingerprint"],
-                "importance": entry["last_importance"],
+                "quadrant": entry["last_quadrant"],
                 "status": entry["last_status"],
                 "notified_message_ids": message_ids,
             }

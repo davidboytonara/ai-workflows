@@ -29,6 +29,10 @@ import agents_config  # noqa: F401,E402
 
 
 STATE_VERSION = 1
+# Kept as a literal (not imported from utils.priority) so this module keeps
+# loading standalone via importlib.util.spec_from_file_location, as the test
+# suite does — it does not put scripts/ on sys.path for a bare "utils" import.
+VALID_QUADRANTS = {"eliminate", "schedule", "delegate", "do_now"}
 STATE_PATH = Path.home() / ".agents" / "state" / "gmail-ingest" / "state.json"
 LOCK_PATH = Path.home() / ".agents" / "state" / "gmail-ingest" / "state.lock"
 
@@ -102,7 +106,9 @@ def valid_ledger_entry(rec: Any, cutoff_ms: int) -> bool:
         return False
     if not isinstance(rec.get("last_fingerprint"), str):
         return False
-    if rec.get("last_importance") not in {"urgent", "important", "low"}:
+    valid_quadrant = rec.get("last_quadrant") in VALID_QUADRANTS
+    valid_legacy_importance = rec.get("last_importance") in {"urgent", "important", "low"}
+    if not (valid_quadrant or valid_legacy_importance):
         return False
     if not isinstance(rec.get("last_status"), str):
         return False

@@ -12,7 +12,7 @@ A category-grouped Slack digest of the work-item deltas whose notification decis
 
 ## Context
 
-State lives at `~/.agents/state/gmail-ingest/state.json`, written by the **gmail-ingest** task (`ingest.md`), whose **Classification schema** supplies each item's `category` and importance. Selection, grouping, formatting, anomaly rendering, and the stamp payload are fully scripted by `compose` (`scripts/compose_notification.py`); the manual rules it implements are preserved in [`manual-compose.md`](manual-compose.md) for fallback. LLM needed because the heartbeat daemon executes tasks as agent turns; the agent only wires the commands below and applies the fallback rule.
+State lives at `~/.agents/state/gmail-ingest/state.json`, written by the **gmail-ingest** task (`ingest.md`), whose **Classification schema** supplies each item's `category` and its urgency/importance axes (collapsed into one Eisenhower quadrant). Selection, grouping, formatting, anomaly rendering, and the stamp payload are fully scripted by `compose` (`scripts/compose_notification.py`); the manual rules it implements are preserved in [`manual-compose.md`](manual-compose.md) for fallback. LLM needed because the heartbeat daemon executes tasks as agent turns; the agent only wires the commands below and applies the fallback rule.
 
 **Run** — with `CLI="$HOME/.agents/.venv/bin/python $HOME/.agents/workflows/gmail-workflow/cli.py"` and `TMP=$(mktemp -d)`:
 

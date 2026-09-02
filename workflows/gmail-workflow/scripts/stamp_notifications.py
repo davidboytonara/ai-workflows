@@ -8,6 +8,7 @@ import json
 import sys
 from typing import Any
 
+from utils.priority import QUADRANT_RANK, quadrant_for
 from utils.state_io import load_state, prune, save_state, state_lock, utc_now
 
 VALID_CHANNELS = {"urgent", "digest"}
@@ -40,12 +41,17 @@ def stamp_item(state: dict[str, Any], channel: str, item: dict[str, Any], now: s
         return 0
 
     message_ids = normalize_message_ids(item.get("message_ids"))
+    quadrant = item.get("quadrant_current")
+    if quadrant not in QUADRANT_RANK:
+        quadrant = quadrant_for(item.get("urgency_current"), item.get("importance_current"))
     ledger = state.setdefault("notification_ledger", {})
     ledger[item_key] = {
         "last_notified_at": now,
         "last_notified_channel": channel,
         "last_fingerprint": str(item.get("current_fingerprint") or ""),
-        "last_importance": str(item.get("importance_current") or "low"),
+        "last_urgency": str(item.get("urgency_current") or ""),
+        "last_importance": str(item.get("importance_current") or ""),
+        "last_quadrant": quadrant,
         "last_status": str(item.get("status") or "open"),
         "last_seen_ms": to_int(item.get("last_seen_ms")),
         "notified_message_ids": message_ids,

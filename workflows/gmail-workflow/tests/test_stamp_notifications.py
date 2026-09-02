@@ -48,7 +48,9 @@ class StampNotificationsTest(unittest.TestCase):
                     {
                         "item_key": "thread:work:t1",
                         "current_fingerprint": "sha1:abc",
+                        "urgency_current": "not_urgent",
                         "importance_current": "important",
+                        "quadrant_current": "schedule",
                         "status": "open",
                         "last_seen_ms": 2_000_000_000_001,
                         "message_ids": ["m1", "m2"],
@@ -73,6 +75,7 @@ class StampNotificationsTest(unittest.TestCase):
             ledger = state["notification_ledger"]["thread:work:t1"]
             self.assertEqual(ledger["last_notified_channel"], "digest")
             self.assertEqual(ledger["last_fingerprint"], "sha1:abc")
+            self.assertEqual(ledger["last_quadrant"], "schedule")
             self.assertEqual(ledger["notified_message_ids"], ["m1", "m2"])
             self.assertEqual(state["messages"]["m1"]["pushed"]["digest"], "old-digest")
             self.assertRegex(state["messages"]["m2"]["pushed"]["digest"], r"^\d{4}-\d{2}-\d{2}T")
