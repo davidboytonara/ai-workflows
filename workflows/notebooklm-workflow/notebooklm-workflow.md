@@ -42,8 +42,11 @@ PY="$HOME/.agents/.venv/bin/python"
 - Q&A: `$SCRIPTS/chat.py ask "<prompt>" --json`, or `--save-as-note --note-title "<t>"`.
 - Generate: `$SCRIPTS/generate.py <type> [flags] --wait`, `<type>` ∈ `audio`, `video`, `slide-deck`, `report`, `quiz`, `flashcards`, `infographic`, `data-table`, `mind-map`. Examples: `generate.py report --format briefing-doc --wait`, `generate.py slide-deck --format detailed --wait`, `generate.py audio "deep dive on chapter 3" --format deep-dive --wait`. `--wait` already handles transient throttling/polling; if still throttled, lower frequency and retry.
 - Download: `$SCRIPTS/artifact.py download <type> <local-path> [--format <fmt>]`, e.g. `download report ./briefing.md`, `download slide-deck ./slides.pptx --format pptx`, `download data-table ./table.csv`. Expired artifact URL → re-list with `$SCRIPTS/artifact.py list --type <type>` and retry.
+- PDF: no `generate`/`download` type produces PDF natively — `$SCRIPTS/pdf_export.py <downloaded.md> <output.pdf> [--title "<t>"]` converts a downloaded Markdown file locally and offline (no NotebookLM call, no cloud dependency) after the fact. Only takes Markdown in; run it on a `report` download, not on `data-table`'s CSV or `mind-map`'s JSON.
 
 **Output destinations** (vault rules): markdown → `Fleeting Notes/`; when the user named a project → that project's `Attachments/`.
+
+**Regulatory document synthesis** (public-only — see the Terms-of-Service notice above and the Constraints below): `source_batch.py <regulator-pdf-urls>...` to ingest, then `generate.py report --format briefing-doc --wait` and `artifact.py download report ./briefing.md`, then `pdf_export.py ./briefing.md ./briefing.pdf` for a deliverable a compliance/audit reader expects as PDF. This is the one path in this workflow where the PDF step matters most — a markdown-only output is a real gap for that audience.
 
 **Downstream handoff:** hand the downloaded artifact to whatever workflow owns that file type in your setup (`.pptx` → a deck workflow, `.csv` / `.xlsx` → a spreadsheet workflow, `.md` report → further edit/convert as needed). Full cookbook: `references/interop.md`.
 
@@ -55,6 +58,7 @@ PY="$HOME/.agents/.venv/bin/python"
 - `_env.py --bootstrap` non-zero → installation blocked; stop and ask the user.
 - Clarify before acting: goal (`ask` / `research` / `generate` / `download`), notebook target (new vs existing id), source list (URLs, YouTube, local files), output artifact type + destination path, and any downstream handoff (a document, spreadsheet, deck, gmail, or clickup workflow in your setup).
 - For more than 3 sources, run `source_batch.py` instead of looping add/wait by hand. Exit 1 → report the failed sources from its summary and continue with `ready_ids`; exit 2 (usage) or 3 (bootstrap) → fix per the rules above before retrying.
+- Confidential or non-public material — audit evidence, client/bank data, anything under NDA or regulatory secrecy — never goes through this workflow, source ingestion included: `notebooklm-py` is an unofficial client and every source lands on Google's infrastructure. Public regulator text (circulars, published rules) is in scope; the underlying evidence a compliance review is based on is not. When unsure whether a source is public, ask before adding it.
 - Final report must include: notebook id, ingested source ids, artifact ids, local output paths, downstream workflow triggered (if any), and remaining caveats (throttling, expired artifact URL, source parse quality).
 
 ## Verify
@@ -65,4 +69,5 @@ $HOME/.agents/.venv/bin/python $SCRIPTS/session.py auth-check --test    # exit 0
 $HOME/.agents/.venv/bin/python $SCRIPTS/notebook.py list                # notebook exists
 $HOME/.agents/.venv/bin/python $SCRIPTS/artifact.py list --type <type>  # artifact generated
 ls -l <local-path>                                                      # downloaded file exists, non-empty
+file <output.pdf>                                                       # if a PDF was requested: reports "PDF document"
 ```

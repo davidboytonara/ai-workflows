@@ -15,6 +15,10 @@ licensed — Apache-2.0, MIT, or BSD-3-Clause:
 - `playwright` (Apache-2.0) — the `playwright` workflow.
 - `python-pptx`, `beautifulsoup4`, `croniter`, `notebooklm-py`, `PyYAML`
   (MIT or BSD-3-Clause).
+- `markdown` (BSD), `xhtml2pdf` (Apache-2.0) — the `notebooklm-workflow`
+  workflow's Markdown-to-PDF conversion (`pdf_export.py`), written from
+  scratch against these packages; see "Not included, deliberately" below for
+  why it isn't derived from the Anthropic `pdf` skill.
 
 Note that `notebooklm-py` is an **unofficial** client for Google NotebookLM; see the
 Terms-of-Service notice in the README before using that workflow.
@@ -65,3 +69,10 @@ reproduction, derivative works, and distribution:
 
 If you want that functionality, re-author it from scratch against `pypdf`,
 `python-docx`, and `openpyxl` rather than adapting the Anthropic files.
+
+`notebooklm-workflow/pdf_export.py` is exactly that kind of from-scratch build, scoped
+narrowly to the one gap that workflow actually had (no `generate`/`download` type
+produces PDF): plain Markdown → HTML → PDF via `markdown` + `xhtml2pdf`, written
+independently against those packages' own public APIs, not adapted from or derived
+from any Anthropic skill file. DOCX/XLSX/PPTX authoring helpers remain out of scope
+here for the same reason stated above.
