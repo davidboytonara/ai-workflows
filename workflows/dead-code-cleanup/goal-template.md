@@ -1,6 +1,6 @@
 # goal.md template — dead-code-cleanup
 
-Helper for `dead-code-cleanup.md` **Goal authoring**. Copy the block below into `$HD/goal.md`, replace every `<...>` placeholder from `$HD/inventory.json` + `$HD/repo-policy.md`, apply the tailoring notes, then show it to the user and pause for approval (the **goal approval gate** in `../casper/casper.md`). Placeholders: `<REPO>` main-checkout path, `<BASE>` base branch, `<BRANCH>`/`<WORKTREE_DIR>` per the repo's worktree convention, `<FULL_GATE_CMD>` the repo's full local gate, `<BASELINE_CMD>` the repo's documented coverage-baseline regeneration command, `<CONVENTION>` its findings convention.
+Helper for `dead-code-cleanup.md` **Goal authoring**. This is the detector-driven counterpart to the generic [`../goal-authoring/goal-draft-template.md`](../goal-authoring/goal-draft-template.md) — same goal.md shape and contract rules, but built from `inventory.json` + `repo-policy.md` instead of a prose record. Copy the block below into `$HD/goal.md`, replace every `<...>` placeholder from `$HD/inventory.json` + `$HD/repo-policy.md`, apply the tailoring notes, then show it to the user and pause for approval (the **goal approval gate** in `../casper/casper.md`). Placeholders: `<REPO>` main-checkout path, `<BASE>` base branch, `<BRANCH>`/`<WORKTREE_DIR>` per the repo's worktree convention, `<FULL_GATE_CMD>` the repo's full local gate, `<BASELINE_CMD>` the repo's documented coverage-baseline regeneration command, `<CONVENTION>` its findings convention.
 
 ````markdown
 ## Goal
@@ -101,10 +101,12 @@ Constraints:
 
 ## Contract rules baked into this template
 
+The generic rules (numbering/pairing, the judgment cap, the heredoc ban, timeout sizing) live in [`../goal-authoring/goal-draft-template.md`](../goal-authoring/goal-draft-template.md)'s "Contract rules baked into this template" — read those alongside the dead-code-cleanup-specific rules below.
+
 - Verification never references the executor's worktree contents — it is deleted post-merge. Absence checks run against `origin/<BASE>` (`git cat-file -e` / `git show`); the full gate runs in the main checkout after the executor's post-merge sync (criterion 4's `merge-base --is-ancestor` proves the sync happened).
 - Criterion 4 declares its own realistic timeout (the harness default is 300 s; a full gate needs more — size `timeout=` to the repo's real gate duration). If the repo has a coverage-floor baseline, a stale baseline fails this gate, so criterion 4 also proves the baseline co-change.
-- Keep judgment items ≤ 2. Criterion 6 stays judgment only while the convention is prose; downgrade it to a command when the convention is file-based with predictable naming (e.g. `test -f <findings-dir>/<id>-*.md` per id).
-- Verification commands must NOT use heredocs (`<<'EOF'`): the verifier's command extraction is indentation-hostile and a mangled terminator makes the criterion fail without running. For per-item loops, define an inline function and call it once per item (`chk() { ...; }` then `chk <path> <symbol>` lines) — indentation-immune and equally diffable.
+- Criterion 6 stays judgment only while the convention is prose; downgrade it to a command when the convention is file-based with predictable naming (e.g. `test -f <findings-dir>/<id>-*.md` per id) — it is one of the goal's two allowed judgment items.
+- For per-item verification loops, define an inline function and call it once per item (`chk() { ...; }` then `chk <path> <symbol>` lines) — indentation-immune and equally diffable, and avoids the heredoc ban below.
 
 ## Tailoring notes
 

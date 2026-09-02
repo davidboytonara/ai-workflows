@@ -14,6 +14,8 @@ The requested operation completes through the workflow-local CLI: triage is dedu
 
 Shorthand `SCRIPTS=.agents/workflows/gmail-workflow`; interpreter `$HOME/.agents/.venv/bin/python`.
 
+**Turning an email into a casper goal.** This workflow only reads, triages, drafts, and reversibly cleans up — it never plans or executes work. When an email should turn into an approved `casper` run (e.g. "handle what this thread is asking for"), use [`../goal-authoring/goal-authoring.md`](../goal-authoring/goal-authoring.md) to draft `$HD/goal.md` from the message/thread, then hand off to `../casper/casper.md`.
+
 **Bootstrap** (exit 0 → proceed; non-zero → install blocked, stop and ask):
 
 ```bash
