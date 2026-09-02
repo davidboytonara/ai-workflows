@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "adfb729aec527a65ddf9a5a80f7949ac92bfab34",
-    "indexed_at": "2026-09-02T08:52:55Z",
-    "project": "home-user-ai-workflows",
-    "nodes": 2759,
-    "edges": 11059,
-    "original_size": 12910592,
-    "compressed_size": 2533011,
-    "compression_level": 3
+    "commit": "ea63f80c33907c674aedf22bc7082f4f1247e3d9",
+    "indexed_at": "2026-09-02T09:32:50Z",
+    "project": "home-runner-work-ai-workflows-ai-workflows",
+    "nodes": 2774,
+    "edges": 11287,
+    "original_size": 10354688,
+    "compressed_size": 1912184,
+    "compression_level": 9
 }
