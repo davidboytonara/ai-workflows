@@ -111,6 +111,7 @@ instruction file (`AGENTS.md`, `CLAUDE.md`, or whatever yours reads) and adjust.
 | --- | --- |
 | `casper` | Run an approved complex goal as resumable, claim-safe fan-out execution. |
 | `heartbeat` | Schedule recurring agent tasks via a systemd user daemon (Linux). |
+| `memory-workflow` | Persistent memory: `load-memory` at session start, `distill-memory` to capture, `maintain-memory` for health checks. |
 
 ### Browser automation
 

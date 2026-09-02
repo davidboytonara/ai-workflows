@@ -39,6 +39,28 @@ jobs:
           ./scripts/install.sh --home "$H"
           grep -q 'pk_mine' "$H/.agents/.env" || { echo ".env was overwritten" >&2; exit 1; }
 
+  readme-lists-every-workflow:
+    name: README documents every discoverable workflow
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: cross-check list_workflows.py against README.md
+        run: |
+          missing=0
+          python3 workflows/work-with-workflow/list_workflows.py \
+            | grep -oE '^\| `workflows/[^`]+`' \
+            | sed -E 's#^\| `workflows/([^/]+)/.*`#\1#' \
+            | sort -u \
+            | while read -r name; do
+                grep -q "\`$name\`" README.md \
+                  || echo "README.md has no row for discoverable workflow: $name"
+              done > /tmp/missing.txt
+          if [ -s /tmp/missing.txt ]; then
+            cat /tmp/missing.txt >&2
+            exit 1
+          fi
+          echo "OK: every workflow list_workflows.py discovers is named in README.md"
+
   no-secrets:
     name: no credential files committed
     runs-on: ubuntu-latest
