@@ -67,8 +67,12 @@ jobs:
           python -m pip install --quiet pytest
           failed=0
           for d in $(find workflows -type d -name tests | sort); do
-            echo "::group::$d"
-            (cd "$(dirname "$d")" && python -m pytest tests -q) || failed=1
+            wf="$(dirname "$d")"
+            echo "::group::$wf"
+            if [ -f "$wf/requirements.txt" ]; then
+              python -m pip install --quiet -r "$wf/requirements.txt" || { failed=1; echo "::endgroup::"; continue; }
+            fi
+            (cd "$wf" && python -m pytest tests -q) || failed=1
             echo "::endgroup::"
           done
           exit $failed
