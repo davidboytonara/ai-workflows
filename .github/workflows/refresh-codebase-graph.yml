@@ -1,0 +1,75 @@
+name: refresh codebase graph
+
+# Keeps .codebase-memory/ (the codebase-memory-mcp knowledge graph committed
+# for this repo — see workflows/codebase-memory-workflow/) from going stale,
+# without re-indexing on every single push.
+#
+# Gate is real commit count, not a schedule or a separate counter file:
+# .codebase-memory/artifact.json already records the exact commit the graph
+# was last built from, so "every 5 merges" is `git rev-list --count` between
+# that commit and HEAD >= 5. This also makes the job self-limiting — after it
+# pushes its own refresh commit, the next run's count is 1 (just that commit),
+# so it no-ops instead of looping.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-codebase-graph
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: reindex every 5 merges to main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: count commits since last graph refresh
+        id: gate
+        run: |
+          LAST=$(python3 -c "import json; print(json.load(open('.codebase-memory/artifact.json'))['commit'])" 2>/dev/null || echo "")
+          if [ -z "$LAST" ] || ! git cat-file -e "$LAST" 2>/dev/null; then
+            echo "no valid last-indexed commit recorded in artifact.json; refreshing"
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          COUNT=$(git rev-list --count "$LAST"..HEAD)
+          echo "commits since last graph refresh: $COUNT"
+          if [ "$COUNT" -ge 5 ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.should_run == 'true'
+        with:
+          node-version: '22'
+
+      - name: install codebase-memory-mcp
+        if: steps.gate.outputs.should_run == 'true'
+        run: npm install -g codebase-memory-mcp
+
+      - name: reindex with persistence
+        if: steps.gate.outputs.should_run == 'true'
+        run: codebase-memory-mcp cli index_repository --repo-path "$GITHUB_WORKSPACE" --persistence true
+
+      - name: commit refreshed graph
+        if: steps.gate.outputs.should_run == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .codebase-memory/
+          if git diff --cached --quiet; then
+            echo "graph unchanged since last refresh; nothing to commit"
+            exit 0
+          fi
+          git commit -m "chore: refresh codebase-memory graph"
+          git push origin HEAD:main

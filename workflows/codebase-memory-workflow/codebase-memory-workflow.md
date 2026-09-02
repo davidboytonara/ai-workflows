@@ -46,13 +46,13 @@ This repo commits its own graph at `.codebase-memory/` (`graph.db.zst` + `artifa
   cat <repo>/.codebase-memory/artifact.json   # .commit field
   ```
   Equal → trust the graph as-is. Different → run `detect_changes --since <artifact.json's commit>` first; its `impacted` set is what the graph doesn't yet know about — treat those files/symbols as ungraphed and fall back to Read/Grep for them specifically, rather than distrusting the whole graph.
-- **Refresh after a non-trivial edit — interim rule, until the planned CI job exists.** Before committing a change that alters structure (new/renamed/deleted functions, files, or call relationships — not a doc-only or comment-only edit), re-index and re-commit the artifact in the same change:
+- **Refresh cadence is automated.** [`.github/workflows/refresh-codebase-graph.yml`](../../.github/workflows/refresh-codebase-graph.yml) re-indexes and pushes `.codebase-memory/` to `main` on its own — gated on real commit count via `artifact.json`'s recorded commit (`git rev-list --count <that commit>..HEAD >= 5`), not a schedule or a separate counter, and self-limiting (its own refresh commit only advances the count by 1, so it doesn't re-trigger itself). Don't add a second manual "re-index before every structural PR" habit on top of it — that's exactly the redundant mechanism this job replaces.
+- **Manual refresh is for today, not routine.** Only reach for it when you need the graph correct *before* the next automatic refresh lands — e.g. you're about to act on it now and the gap matters:
   ```bash
   codebase-memory-mcp cli index_repository --repo-path <repo> --persistence true
-  git -C <repo> add .codebase-memory/
+  git -C <repo> add .codebase-memory/ && git -C <repo> commit -m "chore: refresh codebase-memory graph"
   ```
-  A stale committed graph is worse than none — it answers confidently and wrongly. Don't leave one behind on purpose.
-  **Planned:** a GitHub Action is intended to refresh `.codebase-memory/` on `main` automatically (every 5 merges, not per-PR — a cadence, not a per-commit gate). Once that job exists, this bullet becomes the job's responsibility, not a per-PR manual step — update it to say so (point at the workflow file, drop the manual command) instead of leaving both in force. Until then this manual step is the only thing keeping the artifact honest, so don't skip it.
+  A stale committed graph is worse than none — it answers confidently and wrongly — but the fix for routine staleness is the automated job above, not a habit of doing its job by hand.
 
 ## Constraints
 
