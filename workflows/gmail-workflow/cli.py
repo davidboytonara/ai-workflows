@@ -98,6 +98,11 @@ COMMANDS: dict[str, dict[str, object]] = {
         "defaults": [],
         "help": "seed notification ledger from existing pushed markers",
     },
+    "migrate-priority-schema": {
+        "script": GMAIL_SCRIPT_DIR / "migrate_priority_schema.py",
+        "defaults": [],
+        "help": "migrate legacy single-field importance to urgency+importance+quadrant",
+    },
 }
 
 

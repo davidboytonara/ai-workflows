@@ -13,22 +13,24 @@ These are work-item deltas, not raw messages. Reply- and memory-aware status is 
 
 ## Digest message
 
-Group by `category` (ingest-schema order: Personal, Work, Project, Finance, Travel, Calendar, Newsletter, Promotion, System, Social, Information, Other; empty → Other); within a category sort by `importance_current` (urgent fallback first, then important, then low), then `last_seen_ms` descending:
+Group by `category` (ingest-schema order: Personal, Work, Project, Finance, Travel, Calendar, Newsletter, Promotion, System, Social, Information, Other; empty → Other); within a category sort by `quadrant_current` (do_now first, then delegate, then schedule, then eliminate), then `last_seen_ms` descending:
 
 ```text
 *Digest <HH:MM>* — N work items
 :chart_with_upwards_trend: *example.com|q3-budget* — 7 today vs avg 1.4/day      ← only at 10:00 if any
 
 *Work* (3, 1 needs action)
-  • *important* — <From display> — <Subject>
+  • *Schedule* — <From display> — <Subject>
     _<latest_summary>_ — 2 msgs in thread, new since last digest
-  • *low* — <From display> — <Subject>
+  • *Eliminate* — <From display> — <Subject>
     _<latest_summary>_
 
 *Finance* (2)
-  • *important* — <From display> — <Subject>
+  • *Schedule* — <From display> — <Subject>
     _<latest_summary>_
 ```
+
+The bullet's bold word is the item's Eisenhower quadrant display label — `Do Now` / `Delegate` / `Schedule` / `Eliminate` (see `../heartbeat/ingest.md`'s Classification schema) — not the raw urgency or importance value.
 
 Bullet rules: one bullet per selected work item, from `latest_from`, `latest_subject`, `latest_summary`. Append ` — <message_count> msgs in thread, new since last digest` when `message_count > 1`; omit when 1. Append ` — memory next: <next_action>` when `memory.next_action` is present. When `notification.reason == "new_email_after_memory_done"`, label the bullet `*reopened?*` / mention `new email after completed memory`. When an included blocked memory has `memory.blocked_by`, mention `was blocked by <blocked_by>; new email may change blocker`. Category headers read `(N, M needs action)`, dropping `, M needs action` when M = 0.
 
@@ -61,7 +63,9 @@ Pipe exactly the included (digest) / pushed, i.e. capped (urgent) work-item obje
     {
       "item_key": "thread:work:...",
       "current_fingerprint": "sha1:...",
+      "urgency_current": "not_urgent",
       "importance_current": "important",
+      "quadrant_current": "schedule",
       "status": "open",
       "last_seen_ms": 1776936543000,
       "message_ids": ["msg1", "msg2"]

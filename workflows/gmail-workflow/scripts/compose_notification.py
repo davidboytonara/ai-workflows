@@ -34,6 +34,7 @@ from datetime import datetime, timezone
 from email.utils import parseaddr
 from typing import Any
 
+from utils.priority import QUADRANT_DISPLAY, QUADRANT_RANK
 from utils.state_io import STATE_PATH
 
 # Load ~/.agents/.env and ~/.agents/.config into os.environ (see .env.example).
@@ -51,11 +52,10 @@ CATEGORY_ORDER = [
     "Personal", "Work", "Project", "Finance", "Travel", "Calendar",
     "Newsletter", "Promotion", "System", "Social", "Information", "Other",
 ]
-IMPORTANCE_ORDER = {"urgent": 0, "important": 1, "low": 2}
 ACTION_FOR_KIND = {"digest": "include_digest", "urgent": "push_urgent"}
 STAMP_KEYS = (
-    "item_key", "current_fingerprint", "importance_current",
-    "status", "last_seen_ms", "message_ids",
+    "item_key", "current_fingerprint", "urgency_current", "importance_current",
+    "quadrant_current", "status", "last_seen_ms", "message_ids",
 )
 SLOT_PATTERN = re.compile(r"^\d{1,2}:\d{2}$")
 
@@ -145,8 +145,9 @@ def digest_bullet(item: dict[str, Any]) -> list[str]:
     memory = memory_of(item)
     if str(memory.get("status") or "").lower() == "blocked" and memory.get("blocked_by"):
         suffix += f" — was blocked by {memory['blocked_by']}; new email may change blocker"
+    quadrant = str(item.get("quadrant_current") or "")
     return [
-        f"  • *{item.get('importance_current')}* — {from_display(item.get('latest_from'))}"
+        f"  • *{QUADRANT_DISPLAY.get(quadrant, quadrant)}* — {from_display(item.get('latest_from'))}"
         f" — {item.get('latest_subject')}",
         f"    _{item.get('latest_summary')}_{suffix}",
     ]
@@ -178,7 +179,7 @@ def compose_digest(
         group = sorted(
             groups[category],
             key=lambda it: (
-                IMPORTANCE_ORDER.get(str(it.get("importance_current")), 3),
+                -QUADRANT_RANK.get(str(it.get("quadrant_current")), 0),
                 -int(it.get("last_seen_ms") or 0),
             ),
         )

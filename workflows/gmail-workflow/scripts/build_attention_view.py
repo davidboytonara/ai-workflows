@@ -25,6 +25,13 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+from utils.priority import (  # noqa: E402
+    ACTIONABLE_QUADRANTS,
+    QUADRANT_RANK,
+    QUADRANT_AXES,
+    quadrant_from_ledger_entry,
+    quadrant_from_record,
+)
 from utils.state_io import STATE_PATH  # noqa: E402
 
 # Load ~/.agents/.env and ~/.agents/.config into os.environ (see .env.example).
@@ -42,9 +49,6 @@ LOOKBACK_DAYS = 30
 LEDGER_RETENTION_DAYS = 45
 DEFAULT_MAX_THREAD_FETCH = 25
 DEFAULT_REPLY_RESOLUTION_DAYS = 3
-IMPORTANCE_RANK = {"low": 0, "important": 1, "urgent": 2}
-ACTIONABLE_IMPORTANCE = {"urgent", "important"}
-DIGEST_IMPORTANCE = {"important", "low"}
 WAITING_ON_OTHER_STATUSES = {"awaiting_other_party", "likely_resolved"}
 HIGH_RISK_SIGNAL_TERMS = (
     "deadline",
@@ -79,11 +83,6 @@ def to_int(value: Any, default: int = 0) -> int:
         return default
 
 
-def normalize_importance(value: Any) -> str:
-    text = str(value or "low").lower()
-    return text if text in IMPORTANCE_RANK else "low"
-
-
 def load_state_readonly(path: Path = STATE_PATH) -> dict[str, Any]:
     """Load state without invoking state_io.load_state side effects."""
     if not path.exists():
@@ -114,7 +113,7 @@ def latest_message(messages: list[tuple[str, dict[str, Any]]]) -> tuple[str, dic
 def fingerprint_for(item: dict[str, Any]) -> str:
     stable = {
         "item_key": item["item_key"],
-        "importance_current": item["importance_current"],
+        "quadrant_current": item["quadrant_current"],
         "needs_action": item["needs_action"],
         "latest_message_id": item["latest_message_id"],
         "latest_summary": item["latest_summary"],
@@ -136,7 +135,9 @@ def usable_ledger_entry(ledger_entry: Any, ledger_cutoff_ms: int | None = None) 
     last_seen_ms = to_int(ledger_entry.get("last_seen_ms"), -1)
     if last_seen_ms < 0 or (ledger_cutoff_ms is not None and last_seen_ms < ledger_cutoff_ms):
         return None
-    if normalize_importance(ledger_entry.get("last_importance")) != ledger_entry.get("last_importance"):
+    valid_quadrant = ledger_entry.get("last_quadrant") in QUADRANT_RANK
+    valid_legacy_importance = ledger_entry.get("last_importance") in {"urgent", "important", "low"}
+    if not (valid_quadrant or valid_legacy_importance):
         return None
     if not isinstance(ledger_entry.get("last_status"), str):
         return None
@@ -185,7 +186,7 @@ def is_own_from(from_header: str, own_addresses: set[str]) -> bool:
 def high_risk_signal(item: dict[str, Any]) -> bool:
     text = " ".join(
         str(item.get(key) or "")
-        for key in ("latest_subject", "latest_summary", "category", "importance_current")
+        for key in ("latest_subject", "latest_summary", "category", "quadrant_current")
     ).lower()
     return any(term in text for term in HIGH_RISK_SIGNAL_TERMS)
 
@@ -429,7 +430,7 @@ def apply_memory_notification_policy(items: list[dict[str, Any]]) -> None:
 
         reason = str(notification.get("reason") or "")
         status = str(item.get("status") or "")
-        urgent = item.get("importance_current") == "urgent"
+        urgent = item.get("quadrant_current") == "do_now"
         newer_than_memory = latest_email_newer_than_memory(item, memory)
         inbound_after_reply = item.get("reply_state") == "inbound_after_reply"
         actionable = (bool(item.get("needs_action")) or status in {"awaiting_user", "reopened"}) and newer_than_memory
@@ -448,7 +449,7 @@ def apply_memory_notification_policy(items: list[dict[str, Any]]) -> None:
 
 
 def is_actionable_item(item: dict[str, Any]) -> bool:
-    return item.get("importance_current") in ACTIONABLE_IMPORTANCE or bool(item.get("needs_action"))
+    return item.get("quadrant_current") in ACTIONABLE_QUADRANTS or bool(item.get("needs_action"))
 
 
 def build_thread_fetcher(account: str | None) -> ThreadFetcher:
@@ -578,7 +579,7 @@ def enrich_reply_status(
     candidates = [item for item in items if item.get("thread_ids") and reply_candidate(item, ledger, ledger_cutoff_ms)]
     candidates.sort(
         key=lambda item: (
-            IMPORTANCE_RANK.get(str(item.get("importance_current")), 0),
+            QUADRANT_RANK.get(str(item.get("quadrant_current")), 0),
             to_int(item.get("last_seen_ms")),
         ),
         reverse=True,
@@ -631,22 +632,24 @@ def notification_for(
     previous_channel = previous.get("last_notified_channel") if previous else None
     previous_at = previous.get("last_notified_at") if previous else None
     previous_fingerprint = str(previous.get("last_fingerprint") or "") if previous else ""
-    previous_importance = normalize_importance(previous.get("last_importance")) if previous else "low"
+    previous_quadrant = quadrant_from_ledger_entry(previous) if previous else "eliminate"
     previous_status = str(previous.get("last_status") or "") if previous else ""
     current_fingerprint = item["current_fingerprint"]
-    importance = item["importance_current"]
+    quadrant = item["quadrant_current"]
     status = str(item.get("status") or "open")
 
     if channel == "urgent":
-        if importance != "urgent":
-            action, reason = "suppress", "low_no_action"
+        # Only the true "do now" quadrant (urgent AND important) interrupts;
+        # urgent-but-unimportant (delegate) surfaces in the digest instead.
+        if quadrant != "do_now":
+            action, reason = "suppress", "not_do_now"
         elif status == "reopened":
             if not previous or previous_fingerprint != current_fingerprint or previous_status != "reopened":
                 action, reason = "push_urgent", "reopened"
             else:
                 action, reason = "suppress", "same_fingerprint"
         elif status in WAITING_ON_OTHER_STATUSES:
-            if previous and previous_importance != "urgent":
+            if previous and previous_quadrant != "do_now":
                 action, reason = "push_urgent", "escalated"
             elif previous and previous_fingerprint != current_fingerprint and high_risk_signal(item):
                 action, reason = "push_urgent", "changed"
@@ -654,13 +657,14 @@ def notification_for(
                 action, reason = "suppress", status
         elif not previous:
             action, reason = "push_urgent", "new_item"
-        elif previous_importance != "urgent":
+        elif previous_quadrant != "do_now":
             action, reason = "push_urgent", "escalated"
         elif previous_fingerprint != current_fingerprint:
             action, reason = "push_urgent", "changed"
         else:
             action, reason = "suppress", "same_fingerprint"
     elif channel == "digest":
+        # Every quadrant reaches the digest; only status short-circuits it.
         if status == "reopened":
             if not previous or previous_fingerprint != current_fingerprint or previous_status != "reopened":
                 action, reason = "include_digest", "reopened"
@@ -668,24 +672,14 @@ def notification_for(
                 action, reason = "suppress", "same_fingerprint"
         elif status in WAITING_ON_OTHER_STATUSES:
             action, reason = "suppress", status
-        elif importance in DIGEST_IMPORTANCE:
-            if not previous:
-                action, reason = "include_digest", "new_item"
-            elif previous_fingerprint != current_fingerprint:
-                action, reason = "include_digest", "changed"
-            else:
-                action, reason = "suppress", "same_fingerprint"
-        elif importance == "urgent":
-            if not previous:
-                action, reason = "include_digest", "new_item"
-            elif previous_fingerprint != current_fingerprint:
-                action, reason = "include_digest", "changed"
-            else:
-                action, reason = "suppress", "same_fingerprint"
+        elif not previous:
+            action, reason = "include_digest", "new_item"
+        elif previous_fingerprint != current_fingerprint:
+            action, reason = "include_digest", "changed"
         else:
             action, reason = "suppress", "same_fingerprint"
     else:  # pragma: no cover - argparse constrains this.
-        action, reason = "suppress", "low_no_action"
+        action, reason = "suppress", "not_do_now"
 
     return {
         "action": action,
@@ -700,8 +694,9 @@ def build_item(item_key: str, messages: list[tuple[str, dict[str, Any]]]) -> dic
     latest_id, latest = latest_message(ordered)
     timestamps = [to_int(rec.get("internal_date_ms")) for _, rec in ordered]
 
-    importances = [normalize_importance(rec.get("importance")) for _, rec in ordered]
-    importance_current = max(importances, key=lambda imp: IMPORTANCE_RANK[imp]) if importances else "low"
+    quadrants = [quadrant_from_record(rec) for _, rec in ordered]
+    quadrant_current = max(quadrants, key=lambda q: QUADRANT_RANK[q]) if quadrants else "eliminate"
+    urgency_current, importance_current = QUADRANT_AXES[quadrant_current]
 
     categories_by_time = [str(rec.get("category") or "") for _, rec in ordered if rec.get("category")]
     category = categories_by_time[-1] if categories_by_time else ""
@@ -725,7 +720,9 @@ def build_item(item_key: str, messages: list[tuple[str, dict[str, Any]]]) -> dic
         "latest_subject": str(latest.get("subject") or ""),
         "latest_summary": str(latest.get("summary") or ""),
         "category": category,
+        "urgency_current": urgency_current,
         "importance_current": importance_current,
+        "quadrant_current": quadrant_current,
         "needs_action": needs_action_count > 0,
         "needs_action_count": needs_action_count,
         "status": str(latest.get("status") or "open"),
@@ -811,7 +808,7 @@ def build_attention_items(
     if only_actionable:
         items = [
             item for item in items
-            if item["importance_current"] in ACTIONABLE_IMPORTANCE or item["needs_action"]
+            if item["quadrant_current"] in ACTIONABLE_QUADRANTS or item["needs_action"]
         ]
     items.sort(key=lambda item: (item["last_seen_ms"], item["item_key"]), reverse=True)
     return items
@@ -827,7 +824,7 @@ def render_summary(items: list[dict[str, Any]]) -> str:
         if item.get("reply_state") and item.get("reply_state") != "unknown":
             reply = f" | {item['status']}/{item['reply_state']}"
         lines.append(
-            f"- {item['importance_current']}{action} | {item['message_count']} msg | "
+            f"- {item['quadrant_current']}{action} | {item['message_count']} msg | "
             f"{item['latest_from']} | {item['latest_subject']} | {item['item_key']}{reply}"
         )
     return "\n".join(lines)

@@ -23,7 +23,7 @@ $HOME/.agents/.venv/bin/python "$HOME/.agents/workflows/gmail-workflow/cli.py" \
 
 Stdout is JSON `{messages: [...]}`. The script reads the state file and skips Gmail message IDs already in `state.messages`, so already-classified emails are not re-processed. An auth/scope failure shows `insufficient_scope`, `invalid_grant`, or `403`.
 
-**Classification schema** — each message gets all five fields below. LLM needed because categorizing free-text email content cannot be enumerated in code.
+**Classification schema** — each message gets all six fields below. LLM needed because categorizing free-text email content cannot be enumerated in code.
 
 Category (pick exactly one):
 
@@ -42,15 +42,21 @@ Category (pick exactly one):
 | **Information** | Reference material that isn't a newsletter (docs, KB updates, internal memos) |
 | **Other** | Genuine escape hatch — use sparingly |
 
-Importance (pick exactly one):
+Urgency and Importance are two **independent** axes (Eisenhower matrix) — pick one value from each, not one combined value:
+
+| Urgency | Use when |
+|---|---|
+| **urgent** | Needs a response or decision within hours. Signals: explicit deadline language ("today", "EOD", "ASAP", "by Friday"), a directly-addressed ask from a person, a security alert, a customer escalation. |
+| **not_urgent** | No same-day time pressure, even if it eventually matters. |
 
 | Importance | Use when |
 |---|---|
-| **urgent** | Needs response within hours AND has business or personal stakes. Urgency signals: explicit deadline language ("today", "EOD", "ASAP", "by Friday"), security alerts, customer escalation, boss directly addresses you. |
-| **important** | Should read today; has substance worth your attention. |
-| **low** | Digest-only. Newsletters, FYI cc's, promos, automated notifications without action. |
+| **important** | Has real business or personal stakes — worth your attention regardless of timing. |
+| **not_important** | Low stakes either way — newsletters, FYI cc's, promos, automated notifications without action. |
 
-`needs_action`: boolean — the message demands a reply, decision, or task from the user. Independent of importance (a low-importance message can still need action, e.g. RSVP to a low-stakes invite).
+The pair collapses into one quadrant, applied as the `Casper/<Quadrant>` label and used for notification routing: `urgent`+`important` → **do_now** (pushed immediately); `urgent`+`not_important` → **delegate** (time-pressured but low-stakes — digest only, never an interrupt); `not_urgent`+`important` → **schedule** (digest); `not_urgent`+`not_important` → **eliminate** (digest, lowest priority). This is the common failure mode of a single "importance" field: an urgent-but-trivial message (delegate) used to get treated the same as a genuinely important one — splitting the axes is what makes `urgent`+`not_important` route to the digest instead of interrupting you.
+
+`needs_action`: boolean — the message demands a reply, decision, or task from the user. Independent of both urgency and importance (a `not_important` message can still need action, e.g. RSVP to a low-stakes invite).
 
 `topic_key`: stable slug `<from_domain>|<topic-slug>`, lowercase kebab (e.g. `q3-budget`, `incident`, `invoice`, `1on1-prep`, `roadmap`, `pr-review`). Empty string if no clear topic.
 
@@ -80,7 +86,7 @@ Idempotent: state is keyed by Gmail message id; a successful run adds the `Caspe
 - A blocker (auth/scope error, quota exceeded, ambiguous account state, an unclassifiable oversized message) → write the clarify file and exit 42. Never invent classifications or guess past blockers — halt cleanly rather than corrupt the state file.
 - Cap fetched bodies at 10/run to bound runtime.
 - If `GMAIL_SUMMARIZER_DRY_RUN=true`, pass `--dry-run` to `apply-classifications` (skips Gmail label calls and state writes).
-- Every run ends with one line for the heartbeat history: `SUMMARY: classified N (U urgent, I important, L low, A needs-action, E errors)`.
+- Every run ends with one line for the heartbeat history: `SUMMARY: classified N (D do_now, G delegate, S schedule, X eliminate, A needs-action, E errors)`.
 
 ## Verify
 

@@ -13,7 +13,8 @@ Reads a JSON array on stdin (or from ``--input PATH``):
         "subject": "...",
         "internal_date_ms": 1745539200000,
         "category": "Work",
-        "importance": "urgent",
+        "urgency": "urgent",
+        "importance": "important",
         "needs_action": true,
         "topic_key": "example.com|q3-budget",
         "summary": "..."
@@ -21,8 +22,12 @@ Reads a JSON array on stdin (or from ``--input PATH``):
       ...
     ]
 
+``urgency`` and ``importance`` are independent Eisenhower-matrix axes (see
+``utils/priority.py``); together they collapse into one of four quadrants
+(do_now / schedule / delegate / eliminate).
+
 For each entry:
-- Ensures ``Casper/<Category>``, ``Casper/<Importance>``, ``Casper/Processed``
+- Ensures ``Casper/<Category>``, ``Casper/<Quadrant>``, ``Casper/Processed``
   labels exist (creates if missing).
 - Calls ``messages.modify`` to add the labels (skipped under ``--dry-run``).
 - Updates ``~/.agents/state/gmail-ingest/state.json`` with the per-message
@@ -41,6 +46,7 @@ from datetime import datetime, timezone
 
 from utils.auth_helper import build_gmail_service
 from utils.logger import setup_logger, log_error_with_context
+from utils.priority import QUADRANT_LABEL, normalize_importance, normalize_urgency, quadrant_for
 from utils.state_io import load_state, prune, save_state, state_lock, utc_now
 
 logger = setup_logger(__name__)
@@ -49,18 +55,16 @@ VALID_CATEGORIES = {
     "Personal", "Work", "Project", "Finance", "Travel", "Calendar",
     "Newsletter", "Promotion", "System", "Social", "Information", "Other",
 }
-VALID_IMPORTANCE = {"urgent", "important", "low"}
 
 
 def normalize_classification(entry: dict) -> dict:
     cat = entry.get("category") or "Other"
     if cat not in VALID_CATEGORIES:
         cat = "Other"
-    imp = (entry.get("importance") or "low").lower()
-    if imp not in VALID_IMPORTANCE:
-        imp = "low"
     entry["category"] = cat
-    entry["importance"] = imp
+    entry["urgency"] = normalize_urgency(entry.get("urgency"))
+    entry["importance"] = normalize_importance(entry.get("importance"))
+    entry["quadrant"] = quadrant_for(entry["urgency"], entry["importance"])
     entry["needs_action"] = bool(entry.get("needs_action", False))
     entry["summary"] = (entry.get("summary") or "")[:200]
     return entry
@@ -93,10 +97,10 @@ def get_or_create_label(service, name: str, cache: dict[str, str]) -> str:
     return created["id"]
 
 
-def labels_for(category: str, importance: str) -> list[str]:
+def labels_for(category: str, quadrant: str) -> list[str]:
     return [
         f"Casper/{category}",
-        f"Casper/{importance.capitalize()}",
+        f"Casper/{QUADRANT_LABEL[quadrant]}",
         "Casper/Processed",
     ]
 
@@ -115,7 +119,7 @@ def increment_topic_counts(state: dict, topic_key: str) -> None:
 
 def apply_one(service, entry: dict, cache: dict[str, str], dry_run: bool) -> dict:
     entry = normalize_classification(entry)
-    label_names = labels_for(entry["category"], entry["importance"])
+    label_names = labels_for(entry["category"], entry["quadrant"])
     if entry.get("needs_action"):
         label_names.append("Casper/Action")
 
@@ -147,7 +151,9 @@ def persist(state: dict, entry: dict, label_names: list[str], error: str | None)
         "subject": entry.get("subject"),
         "internal_date_ms": int(entry.get("internal_date_ms", 0)),
         "category": entry["category"],
+        "urgency": entry["urgency"],
         "importance": entry["importance"],
+        "quadrant": entry["quadrant"],
         "needs_action": entry["needs_action"],
         "topic_key": entry.get("topic_key", ""),
         "summary": entry.get("summary", ""),
@@ -210,7 +216,7 @@ def main() -> int:
             svc = services.get(acc) if not args.dry_run else None
 
             if args.dry_run or svc is None:
-                names = labels_for(entry["category"], entry["importance"])
+                names = labels_for(entry["category"], entry["quadrant"])
                 if entry["needs_action"]:
                     names.append("Casper/Action")
                 applied.append({"id": entry["id"], "labels": names, "dry_run": args.dry_run})
