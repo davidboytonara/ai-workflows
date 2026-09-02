@@ -94,6 +94,7 @@ instruction file (`AGENTS.md`, `CLAUDE.md`, or whatever yours reads) and adjust.
 | `bug-fix` | Something is broken — diagnose, fix, prove. |
 | `investigate` | Read-only recon of an unfamiliar area, before planning. |
 | `codebase-memory-workflow` | Structural code questions (who calls X, what would this impact) via a persistent graph instead of a Grep sweep — needs [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp). |
+| `goal-authoring` | Turn an external record (ticket, email, freeform ask) into an approvable `casper` `goal.md`. |
 | `planning` | Decompose a task before any work starts. |
 | `review` | Judge delivered changes; read-only verdict. |
 | `write` | A non-code deliverable: spec, story, docs, report. |
