@@ -108,6 +108,11 @@ workflows/heartbeat/tasks.yaml
 *.tgz
 *.zip
 
+# codebase-memory-mcp local graph store — regenerable, environment-specific,
+# goes stale the moment someone else's commit lands. Regenerate per clone
+# instead of committing it (see codebase-memory-workflow/codebase-memory-workflow.md).
+.codebase-memory/
+
 # Local editor / agent config
 .claude/settings.local.json
 .DS_Store
