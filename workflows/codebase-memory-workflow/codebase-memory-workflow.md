@@ -14,7 +14,7 @@ The structural question is answered from the indexed knowledge graph — one or 
 
 **Setup, once per machine.** Install (`npm install -g codebase-memory-mcp`, a platform package manager, or the prebuilt binary — see the project's own install docs); `codebase-memory-mcp install` self-registers it into whichever MCP-compatible harness you're running (Claude Code, Codex CLI, and 40+ others are auto-detected). No daemon required — it runs as an MCP server over stdio, or as a one-shot CLI.
 
-**Setup, once per repo/clone.** Index before first use, and again after pulling changes made outside this session (a background watcher keeps it in sync with edits made *during* a session, but that doesn't survive a fresh clone or a pull):
+**Setup, once per repo/clone.** Check for a committed `.codebase-memory/graph.db.zst` first (this repo ships one — see below); if there isn't one, index before first use, and re-index again after pulling changes made outside this session (a background watcher keeps it in sync with edits made *during* a session, but that doesn't survive a fresh clone or a pull):
 
 ```
 index_repository(repo_path="<absolute path to the repo root>")
@@ -36,14 +36,31 @@ The path must be absolute — a relative path fails.
 
 **One-off use outside an MCP client.** `codebase-memory-mcp cli <tool> --flag value` (or pipe JSON on stdin) works from a plain shell or a script — run `cli <tool> --help` for its exact flags; passing raw JSON as a single argument still works but is deprecated. As an MCP server: `codebase-memory-mcp` with no arguments (stdio).
 
+## Committed graph for this repo
+
+This repo commits its own graph at `.codebase-memory/` (`graph.db.zst` + `artifact.json` + `.gitattributes`) so a fresh clone or a fresh cloud session skips the initial index — read it before doing a broad Glob/Grep/Read pass on this repo, and edit only the files the graph says are actually involved.
+
+- **Staleness check, always first.** `.codebase-memory/artifact.json`'s `commit` field is the exact commit the graph was built from. Compare it to the current `HEAD`:
+  ```bash
+  git -C <repo> log -1 --format=%H   # current HEAD
+  cat <repo>/.codebase-memory/artifact.json   # .commit field
+  ```
+  Equal → trust the graph as-is. Different → run `detect_changes --since <artifact.json's commit>` first; its `impacted` set is what the graph doesn't yet know about — treat those files/symbols as ungraphed and fall back to Read/Grep for them specifically, rather than distrusting the whole graph.
+- **Refresh after a non-trivial edit.** Before committing a change that alters structure (new/renamed/deleted functions, files, or call relationships — not a doc-only or comment-only edit), re-index and re-commit the artifact in the same change:
+  ```bash
+  codebase-memory-mcp cli index_repository --repo-path <repo> --persistence true
+  git -C <repo> add .codebase-memory/
+  ```
+  A stale committed graph is worse than none — it answers confidently and wrongly. Don't leave one behind on purpose.
+
 ## Constraints
 
 - Never trust the graph over the actual file for anything you're about to edit — it's a locator/navigator, not a source of truth for content. Read the real file and lines before writing a change based on what it returned.
-- The graph goes stale the moment anyone edits after the last index — including mid-session edits by a teammate or a parallel process. `detect_changes --since <last known-good ref>` (or a re-index) is the staleness check; run it before relying on the graph for anything you're about to act on, not only once at session start.
-- Never commit the local graph store to the repo: it's regenerable, environment-specific, and goes stale the moment someone else's commit lands — regenerate per clone/environment instead of syncing it through git. The tool's own optional "commit a compressed `.codebase-memory/graph.db.zst` snapshot so teammates skip reindexing" convenience is declined here for the same reason (`.gitignore` blocks it).
-- Falls back silently, never blocks: if the binary isn't installed or the repo isn't indexed, that's not a blocker — fall back to `../investigate/investigate.md`'s normal Grep/Read approach and move on. Never stop a task to install this unprompted.
+- The committed graph can still go stale mid-session (your own uncommitted edits, or a teammate's parallel work) even when `artifact.json` matched `HEAD` at the start — the staleness check above is a start-of-task gate, not a one-time fact. Re-run it before relying on the graph for anything you're about to act on if real time has passed or edits have landed since.
+- Falls back silently, never blocks: if the binary isn't installed, `.codebase-memory/` is missing, or a target repo other than this one isn't indexed, that's not a blocker — fall back to `../investigate/investigate.md`'s normal Grep/Read approach and move on. Never stop a task to install this unprompted.
 
 ## Verify
 
 - The answer cites a real qualified name, file path, and line range the graph actually returned — not a paraphrase.
-- If the answer was acted on (not just used to orient), a `detect_changes --since <ref>` (or a re-index) confirmed the graph reflected the current `HEAD` before it was trusted.
+- If the answer was acted on (not just used to orient), the staleness check above ran and either confirmed a match or resolved the diff via `detect_changes` before the answer was trusted.
+- If the task changed this repo's structure, `.codebase-memory/artifact.json`'s `commit` field is refreshed to the new `HEAD` (or a follow-up commit that refreshes it) — never leave a structural change unreflected in the committed graph.
