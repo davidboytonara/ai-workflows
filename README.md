@@ -93,6 +93,7 @@ instruction file (`AGENTS.md`, `CLAUDE.md`, or whatever yours reads) and adjust.
 | `implement` | A concrete engineering task: feature, plan step, refactor, test repair. |
 | `bug-fix` | Something is broken — diagnose, fix, prove. |
 | `investigate` | Read-only recon of an unfamiliar area, before planning. |
+| `codebase-memory-workflow` | Structural code questions (who calls X, what would this impact) via a persistent graph instead of a Grep sweep — needs [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp). |
 | `planning` | Decompose a task before any work starts. |
 | `review` | Judge delivered changes; read-only verdict. |
 | `write` | A non-code deliverable: spec, story, docs, report. |
@@ -170,6 +171,7 @@ These are per-workflow, not global — read the workflow file before running it.
   alias table in `casper/LLM_harness.sh` is meant to be edited to match whatever your
   CLI accepts.
 - **Node + `npx`** for `dead-code-cleanup` (uses `knip`).
+- **[`codebase-memory-mcp`](https://github.com/DeusData/codebase-memory-mcp)** (`npm install -g codebase-memory-mcp`, or its own platform installer) for `codebase-memory-workflow`. Optional — that workflow falls back to `investigate` when it isn't installed or the repo isn't indexed.
 - **Node + `npm`** for `kernel-browser` and TypeScript helpers:
   `npm install --prefix ~/.agents tsx @onkernel/sdk`.
 - **`gh` CLI** for `pull-request`.

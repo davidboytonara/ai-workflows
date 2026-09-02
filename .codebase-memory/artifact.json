@@ -1,0 +1,11 @@
+{
+    "schema_version": 2,
+    "commit": "adfb729aec527a65ddf9a5a80f7949ac92bfab34",
+    "indexed_at": "2026-09-02T08:52:55Z",
+    "project": "home-user-ai-workflows",
+    "nodes": 2759,
+    "edges": 11059,
+    "original_size": 12910592,
+    "compressed_size": 2533011,
+    "compression_level": 3
+}
