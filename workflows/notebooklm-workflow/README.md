@@ -6,7 +6,7 @@ with workflow-local docs and references.
 
 ## Layout
 
-- `requirements.txt` — pins `notebooklm-py`
+- `requirements.txt` — pins `notebooklm-py`, `markdown`, `xhtml2pdf`
 - `_env.py` — venv bootstrap + CLI proxy (`run_cli()`); also runnable:
   `$HOME/.agents/.venv/bin/python _env.py --bootstrap`, `--paths`
 - Domain scripts (thin argv forwarders):
@@ -22,6 +22,9 @@ with workflow-local docs and references.
   - `artifact.py` — `artifact` group + `download <type>` in one entry
   - `note.py` — full `note` group
   - `share.py` — full `share` group
+  - `pdf_export.py` — local Markdown → PDF conversion (no cloud call, no
+    NotebookLM API); fills the gap that no `generate`/`download` type
+    produces PDF natively
 
 ## Auth
 
@@ -56,6 +59,7 @@ $HOME/.agents/.venv/bin/python $SCRIPTS/source.py wait <source_id> --timeout 600
 $HOME/.agents/.venv/bin/python $SCRIPTS/chat.py ask "Summarize" --save-as-note --note-title "Summary"
 $HOME/.agents/.venv/bin/python $SCRIPTS/generate.py report --format briefing-doc --wait
 $HOME/.agents/.venv/bin/python $SCRIPTS/artifact.py download report ./briefing.md
+$HOME/.agents/.venv/bin/python $SCRIPTS/pdf_export.py ./briefing.md ./briefing.pdf
 ```
 
 ## Exit codes

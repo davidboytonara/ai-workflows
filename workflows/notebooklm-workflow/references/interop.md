@@ -7,7 +7,7 @@ are examples of the kind of tool you would hand each artifact to. Substitute you
 
 ## Common handoff artifacts
 
-- Report: Markdown (`download report`)
+- Report: Markdown (`download report`) — PDF via `pdf_export.py` when the destination expects one (e.g. audit/regulatory deliverables)
 - Slide deck: PDF or PPTX (`download slide-deck`)
 - Quiz/flashcards: JSON or Markdown (`download quiz`, `download flashcards`)
 - Data table: CSV (`download data-table`)
@@ -48,8 +48,7 @@ are examples of the kind of tool you would hand each artifact to. Substitute you
 
 ### pdf
 
-- Convert and package NotebookLM outputs into PDF briefing bundles.
-- Merge NotebookLM slide PDFs with appendix documents.
+- Shipped in this workflow: `pdf_export.py <downloaded.md> <output.pdf>` converts a `download report` Markdown file to PDF locally — no NotebookLM call, no cloud dependency, and no native PDF type exists on any `generate`/`download` command otherwise. Reach for a `pdf` skill in your own setup only for what this doesn't do: merging multiple PDFs into one bundle, adding appendices, or applying custom branding beyond the plain print stylesheet `pdf_export.py` uses.
 
 ### clickup
 
