@@ -289,7 +289,8 @@ def build_markdown_insert_requests(
 
     for block in blocks:
         if block.kind == "bullet":
-            rendered = f"{'\t' * block.level}{block.text}\n"
+            indent = "\t" * block.level
+            rendered = f"{indent}{block.text}\n"
         else:
             rendered = f"{block.text}\n"
         start = offset
